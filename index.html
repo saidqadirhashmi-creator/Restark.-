@@ -1,0 +1,220 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RESTARK POS</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#101827;color:#f8fafc;font-family:Arial,sans-serif}
+header{background:#172337;padding:20px;display:flex;justify-content:space-between;align-items:center}
+.logo{font-size:25px;font-weight:bold;color:#38d9a9}
+small{color:#94a3b8}
+main{padding:16px;max-width:1100px;margin:auto}
+h2{font-size:20px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0}
+button{border:0;border-radius:9px;padding:12px 16px;background:#26364e;color:white;font-weight:bold;cursor:pointer}
+button.active,.primary{background:#10b981;color:#062b20}
+button.danger{background:#7f1d1d}
+input,select{width:100%;padding:12px;margin:6px 0 12px;border:1px solid #34445d;border-radius:8px;background:#172337;color:white}
+.panel{background:#172337;padding:16px;border-radius:13px;margin-bottom:15px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px}
+.item{background:#26364e;padding:14px;border-radius:10px}
+.item button{width:100%;margin-top:8px}
+.row{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.total{font-size:23px;color:#38d9a9;font-weight:bold}
+.order{border-bottom:1px solid #34445d;padding:12px 0}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<header>
+ <div><div class="logo">RESTARK</div><small>Restaurant Management System</small></div>
+ <div>POS <small> • AFN</small></div>
+</header>
+<main>
+ <div class="tabs">
+  <button class="active" onclick="show('pos',this)">New Order</button>
+  <button onclick="show('orders',this)">Orders</button>
+  <button onclick="show('reports',this)">Reports</button>
+ </div>
+
+ <section id="pos">
+  <div class="panel">
+   <h2>Order Details</h2>
+   <label>Order Type</label>
+   <select id="type" onchange="toggleTable()">
+    <option value="Dine In">Dine In</option>
+    <option value="Takeaway">Takeaway</option>
+   </select>
+   <div id="tableBox">
+    <label>Table Number</label>
+    <select id="table">
+     <option>Table 1</option><option>Table 2</option>
+     <option>Table 3</option><option>Table 4</option>
+     <option>Table 5</option><option>Table 6</option>
+     <option>Table 7</option><option>Table 8</option>
+    </select>
+   </div>
+   <label>Customer Name (Optional)</label>
+   <input id="customer" placeholder="Customer name">
+  </div>
+
+  <div class="panel">
+   <h2>Food & Drinks Menu</h2>
+   <div class="grid" id="menu"></div>
+  </div>
+
+  <div class="panel">
+   <h2>Current Order</h2>
+   <div id="cart">No items added yet.</div>
+   <hr>
+   <div class="row"><b>Total</b><span class="total" id="total">0 AFN</span></div>
+   <button class="primary" style="width:100%;margin-top:15px" onclick="placeOrder()">PLACE ORDER</button>
+   <button style="width:100%;margin-top:8px" onclick="clearCart()">CLEAR ORDER</button>
+  </div>
+ </section>
+
+ <section id="orders" class="hidden">
+  <div class="panel">
+   <h2>All Orders</h2>
+   <div id="orderList">No orders yet.</div>
+  </div>
+ </section>
+
+ <section id="reports" class="hidden">
+  <div class="panel">
+   <h2>Daily Sales Report</h2>
+   <p>Total Orders: <b id="count">0</b></p>
+   <p>Total Sales: <span class="total" id="sales">0 AFN</span></p>
+  </div>
+ </section>
+</main>
+
+<script>
+const products=[
+ {name:"Burger",price:180},
+ {name:"Chicken Burger",price:220},
+ {name:"Pizza",price:350},
+ {name:"French Fries",price:100},
+ {name:"Fried Chicken",price:250},
+ {name:"Sandwich",price:150},
+ {name:"Hot Dog",price:130},
+ {name:"Coca Cola",price:50},
+ {name:"Water",price:30},
+ {name:"Juice",price:80}
+];
+let cart=[];
+let orders=JSON.parse(localStorage.getItem("restark_orders")||"[]");
+
+function money(n){return n.toLocaleString("en-US")+" AFN"}
+
+function renderMenu(){
+ document.getElementById("menu").innerHTML=products.map((p,i)=>`
+ <div class="item">
+ <b>${p.name}</b><p>${money(p.price)}</p>
+ <button onclick="addItem(${i})">+ Add</button>
+ </div>`).join("");
+}
+function addItem(i){
+ let p=products[i];
+ let found=cart.find(x=>x.name===p.name);
+ if(found)found.qty++;
+ else cart.push({...p,qty:1});
+ renderCart();
+}
+function renderCart(){
+ let el=document.getElementById("cart");
+ if(!cart.length){el.innerHTML="No items added yet.";}
+ else el.innerHTML=cart.map((p,i)=>`
+ <div class="row order">
+ <div>${p.name}<br><small>${money(p.price)} × ${p.qty}</small></div>
+ <div>
+ <button onclick="changeQty(${i},-1)">−</button>
+ <button onclick="changeQty(${i},1)">+</button>
+ </div>
+ <b>${money(p.price*p.qty)}</b>
+ </div>`).join("");
+ document.getElementById("total").textContent=money(
+ cart.reduce((s,p)=>s+p.price*p.qty,0));
+}
+function changeQty(i,n){
+ cart[i].qty+=n;
+ if(cart[i].qty<=0)cart.splice(i,1);
+ renderCart();
+}
+function clearCart(){cart=[];renderCart();}
+function toggleTable(){
+ document.getElementById("tableBox").style.display=
+ document.getElementById("type").value==="Dine In"?"block":"none";
+}
+function placeOrder(){
+ if(!cart.length){alert("Please add items first.");return;}
+ let order={
+ id:Date.now(),
+ number:orders.length+1,
+ type:document.getElementById("type").value,
+ table:document.getElementById("type").value==="Dine In"?
+ document.getElementById("table").value:"Takeaway",
+ customer:document.getElementById("customer").value,
+ items:cart.map(x=>({...x})),
+ total:cart.reduce((s,p)=>s+p.price*p.qty,0),
+ status:"Pending",
+ date:new Date().toLocaleString()
+ };
+ orders.unshift(order);
+ save();
+ clearCart();
+ document.getElementById("customer").value="";
+ alert("Order placed successfully!");
+ showOrders();
+}
+function save(){
+ localStorage.setItem("restark_orders",JSON.stringify(orders));
+}
+function showOrders(){
+ let el=document.getElementById("orderList");
+ if(!orders.length){el.innerHTML="No orders yet.";return;}
+ el.innerHTML=orders.map(o=>`
+ <div class="order">
+ <div class="row"><b>Order #${o.number} — ${o.type}</b>
+ <b>${money(o.total)}</b></div>
+ <small>${o.table} | ${o.date}</small>
+ <p>${o.items.map(x=>x.name+" × "+x.qty).join(", ")}</p>
+ <p>Status: <b>${o.status}</b></p>
+ <button onclick="finishOrder(${o.id})">Complete</button>
+ <button class="danger" onclick="deleteOrder(${o.id})">Delete</button>
+ </div>`).join("");
+}
+function finishOrder(id){
+ let o=orders.find(x=>x.id===id);
+ if(o){o.status="Completed";save();showOrders();updateReports();}
+}
+function deleteOrder(id){
+ if(confirm("Delete this order?")){
+ orders=orders.filter(x=>x.id!==id);
+ save();showOrders();updateReports();
+ }
+}
+function updateReports(){
+ let today=new Date().toDateString();
+ let daily=orders.filter(o=>new Date(o.id).toDateString()===today);
+ document.getElementById("count").textContent=daily.length;
+ document.getElementById("sales").textContent=
+ money(daily.reduce((s,o)=>s+o.total,0));
+}
+function show(id,btn){
+ ["pos","orders","reports"].forEach(x=>
+ document.getElementById(x).classList.toggle("hidden",x!==id));
+ document.querySelectorAll(".tabs button").forEach(x=>x.classList.remove("active"));
+ btn.classList.add("active");
+ showOrders();updateReports();
+}
+renderMenu();
+renderCart();
+showOrders();
+updateReports();
+</script>
+</body>
+</html>
